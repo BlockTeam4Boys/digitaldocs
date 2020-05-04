@@ -2,16 +2,16 @@ package main
 
 import (
 	"fmt"
+	"github.com/rs/cors"
 	"net/http"
-
-	"github.com/gorilla/mux"
-	"github.com/ilyakaznacheev/cleanenv"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/postgres"
 
 	"github.com/BlockTeam4Boys/digitaldocs/internal/config"
 	"github.com/BlockTeam4Boys/digitaldocs/internal/model"
 	"github.com/BlockTeam4Boys/digitaldocs/internal/role"
+	"github.com/gorilla/mux"
+	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
 )
 
 var (
@@ -63,5 +63,6 @@ func main() {
 	r.HandleFunc("/api/auth", AuthHandler).Methods("POST")
 	r.HandleFunc("/api/refresh", RefreshHandler)
 	r.HandleFunc("/api/request", RequestHandler).Methods("POST")
-	http.ListenAndServe(":8080", r)
+	corsHandler := cors.Default().Handler(r)
+	http.ListenAndServe(":8080", corsHandler)
 }
