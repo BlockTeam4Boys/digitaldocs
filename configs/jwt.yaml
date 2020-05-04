@@ -1,0 +1,5 @@
+token:
+    cookie_name: token
+    ttl: 5m
+    refresh_time: 30s
+key: big-secret

@@ -1,0 +1,5 @@
+host: localhost
+name: digitaldocs
+user: digitaldocs
+password: digitaldocs
+port: 5432
