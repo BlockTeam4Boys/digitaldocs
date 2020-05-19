@@ -1,6 +1,6 @@
 package config
 
-type Database struct {
+type Postgres struct {
 	Port     string `yaml:"port"`
 	Host     string `yaml:"host"`
 	Name     string `yaml:"name"`

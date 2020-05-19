@@ -1,5 +1,7 @@
-token:
-    cookie_name: token
+access_token:
+    cookie_name: access-token
     ttl: 5m
-    refresh_time: 30s
+refresh_token:
+    cookie_name: refresh-token
+    ttl: 720h
 key: big-secret

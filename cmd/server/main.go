@@ -2,20 +2,28 @@ package main
 
 import (
 	"fmt"
-	"github.com/rs/cors"
 	"net/http"
 
-	"github.com/BlockTeam4Boys/digitaldocs/internal/config"
-	"github.com/BlockTeam4Boys/digitaldocs/internal/model"
-	"github.com/BlockTeam4Boys/digitaldocs/internal/role"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
+
+	"github.com/BlockTeam4Boys/digitaldocs/internal/config"
+	"github.com/BlockTeam4Boys/digitaldocs/internal/middleware"
+	"github.com/BlockTeam4Boys/digitaldocs/internal/model"
+	"github.com/BlockTeam4Boys/digitaldocs/internal/role"
+	sr "github.com/BlockTeam4Boys/digitaldocs/internal/session/repository"
+	ur "github.com/BlockTeam4Boys/digitaldocs/internal/user/repository"
 )
 
 var (
-	DB *gorm.DB
+	DB          *gorm.DB
+	RDB         *redis.Client
+	SessionRepo *sr.RedisTokenRepository
+	UserRepo    *ur.PostgresUserRepository
+	JWTInfo     config.JWT
 )
 
 func migrate() {
@@ -34,8 +42,13 @@ func migrate() {
 }
 
 func init() {
-	cfgDB := config.Database{}
-	err := cleanenv.ReadConfig("configs/db.yaml", &cfgDB)
+	cfgDB := config.Postgres{}
+	err := cleanenv.ReadConfig("configs/postgres.yaml", &cfgDB)
+	if err != nil {
+		panic(err)
+	}
+	cfgRDB := config.Redis{}
+	err = cleanenv.ReadConfig("configs/redis.yaml", &cfgRDB)
 	if err != nil {
 		panic(err)
 	}
@@ -44,10 +57,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	TokenCookieName = cfgJWT.Token.CookieName
-	TokenTTL = cfgJWT.Token.TTL
-	TokenRefreshTime = cfgJWT.Token.RefreshTime
-	JWTKey = []byte(cfgJWT.Key)
+	JWTInfo = cfgJWT
 	argsMsg := "host=%v port=%v user=%v dbname=%v password=%v sslmode=disable"
 	argsDB := fmt.Sprintf(argsMsg, cfgDB.Host, cfgDB.Port, cfgDB.User, cfgDB.Name, cfgDB.Password)
 	DB, err = gorm.Open("postgres", argsDB)
@@ -55,14 +65,36 @@ func init() {
 		panic(err)
 	}
 	migrate()
+	RDB = redis.NewClient(&redis.Options{
+		Addr:     cfgRDB.Addr,
+		Password: cfgRDB.Password,
+		DB:       cfgRDB.DB,
+	})
+	err = RDB.Ping().Err()
+	if err != nil {
+		panic(err)
+	}
+	SessionRepo = sr.NewRedisSessionRepository(RDB, JWTInfo.AccessToken.TTL, JWTInfo.RefreshToken.TTL)
+	UserRepo = ur.NewPostgresUserRepository(DB)
 }
 
 func main() {
 	defer DB.Close()
+	authentication := middleware.NewAuthMiddleware(SessionRepo, JWTInfo.AccessToken.CookieName)
 	r := mux.NewRouter()
-	r.HandleFunc("/api/auth", AuthHandler).Methods("POST")
-	r.HandleFunc("/api/refresh", RefreshHandler)
-	r.HandleFunc("/api/request", RequestHandler).Methods("POST")
-	corsHandler := cors.Default().Handler(r)
-	http.ListenAndServe(":8080", corsHandler)
+	r.Use(mux.CORSMethodMiddleware(r))
+
+	api := r.PathPrefix("/api").Subrouter()
+
+	auth := api.Path("/auth")
+	auth.HandlerFunc(AuthHandler)
+
+	refresh := api.Path("/refresh")
+	refresh.HandlerFunc(RefreshHandler)
+
+	access := api.PathPrefix("/").Subrouter()
+	access.HandleFunc("/request", RequestHandler)
+	access.Use(authentication.Middleware)
+
+	http.ListenAndServe(":8080", r)
 }
