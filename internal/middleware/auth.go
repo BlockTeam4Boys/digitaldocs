@@ -7,6 +7,7 @@ import (
 	"github.com/go-redis/redis"
 
 	sr "github.com/BlockTeam4Boys/digitaldocs/internal/session/repository"
+	"github.com/BlockTeam4Boys/digitaldocs/internal/token"
 )
 
 type AuthMiddleware struct {
@@ -30,7 +31,7 @@ func (a *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 		}
 		accessToken := accessCookie.Value
 		// check access token
-		accessClaims, err := AccessTokenInfo(accessToken, a.sessionRepo.GetUserKey)
+		accessClaims, err := token.AccessTokenInfo(accessToken, a.sessionRepo.GetUserKey)
 		sessionID := accessClaims.SessionID
 		// refresh token already confirmed
 		if accessClaims.ParentRefreshTokenHash == "" {
@@ -52,7 +53,7 @@ func (a *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 					w.WriteHeader(http.StatusUnauthorized)
 					return
 				}
-				accessToken, err := NewToken(accessClaims, []byte(key))
+				accessToken, err := token.New(accessClaims, []byte(key))
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					return
