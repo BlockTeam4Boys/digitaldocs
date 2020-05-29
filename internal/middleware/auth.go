@@ -11,14 +11,16 @@ import (
 )
 
 type AuthMiddleware struct {
-	sessionRepo           *sr.RedisTokenRepository
-	accessTokenCookieName string
+	sessionRepo            *sr.RedisTokenRepository
+	accessTokenCookieName  string
+	refreshTokenCookieName string
 }
 
-func NewAuthMiddleware(sessionRepo *sr.RedisTokenRepository, accessTokenCookieName string) *AuthMiddleware {
+func NewAuthMiddleware(sessionRepo *sr.RedisTokenRepository, accessTokenCookieName, refreshTokenCookieName string) *AuthMiddleware {
 	return &AuthMiddleware{
-		sessionRepo:           sessionRepo,
-		accessTokenCookieName: accessTokenCookieName,
+		sessionRepo:            sessionRepo,
+		accessTokenCookieName:  accessTokenCookieName,
+		refreshTokenCookieName: refreshTokenCookieName,
 	}
 }
 
@@ -70,6 +72,16 @@ func (a *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 			case sr.TokensNotEqualErr:
 				// token is stolen
 				a.sessionRepo.DeleteRefreshToken(sessionID)
+				http.SetCookie(w, &http.Cookie{
+					Name:   a.accessTokenCookieName,
+					Value:  "",
+					MaxAge: -1,
+				})
+				http.SetCookie(w, &http.Cookie{
+					Name:   a.refreshTokenCookieName,
+					Value:  "",
+					MaxAge: -1,
+				})
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			case redis.TxFailedErr:

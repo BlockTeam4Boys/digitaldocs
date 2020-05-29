@@ -80,7 +80,7 @@ func init() {
 
 func main() {
 	defer DB.Close()
-	authentication := middleware.NewAuthMiddleware(SessionRepo, JWTInfo.AccessToken.CookieName)
+	authentication := middleware.NewAuthMiddleware(SessionRepo, JWTInfo.AccessToken.CookieName, JWTInfo.RefreshToken.CookieName)
 	r := mux.NewRouter()
 	r.Use(mux.CORSMethodMiddleware(r))
 
@@ -94,6 +94,8 @@ func main() {
 
 	access := api.PathPrefix("/").Subrouter()
 	access.HandleFunc("/request", RequestHandler)
+	access.HandleFunc("/userinfo", UserInfoHandler)
+	access.HandleFunc("/logout", LogoutHandler)
 	access.Use(authentication.Middleware)
 
 	http.ListenAndServe(":8080", r)

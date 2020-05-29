@@ -78,6 +78,16 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if claims.ParentRefreshTokenHash != dbRefreshTokenHash {
 		SessionRepo.DeleteRefreshToken(sessionID)
+		http.SetCookie(w, &http.Cookie{
+			Name:   JWTInfo.AccessToken.CookieName,
+			Value:  "",
+			MaxAge: -1,
+		})
+		http.SetCookie(w, &http.Cookie{
+			Name:   JWTInfo.RefreshToken.CookieName,
+			Value:  "",
+			MaxAge: -1,
+		})
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
