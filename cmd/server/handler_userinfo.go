@@ -28,53 +28,66 @@ type UserInfo struct {
 }
 
 func getUserInfo(userID uint) UserInfo {
-	const query = `
-		SELECT u.email, 
-			u.organization_id,
-			r.Name as role,
-			o1.name as organization_name, 
-			oa1.to_id, 
-			o2.name as to_name, 
-			oa2.from_id, 
-			o3.name as from_name 
-		FROM   users AS u
-			join roles AS r
-			ON u.role_id = r.id
-			join organizations AS o1 
-			ON u.organization_id = o1.id 
-			join organizations_agreements AS oa1 
-			ON u.organization_id = oa1.from_id 
-			join organizations AS o2 
-			ON oa1.to_id = o2.id 
-			join organizations_agreements AS oa2 
-			ON u.organization_id = oa2.to_id 
-			join organizations AS o3 
-			ON oa2.from_id = o3.id 
-		WHERE  u.id = ?;`
-	var result []struct {
+	var user struct {
 		Email            string
 		Role             string
 		OrganizationID   uint
 		OrganizationName string
-		ToID             uint
-		ToName           string
-		FromID           uint
-		FromName         string
 	}
-	DB.Raw(query, userID).Scan(&result)
+
+	const userQuery = `
+		SELECT u.id,
+       		u.email,
+       		u.organization_id,
+       		r.Name as role,
+       		o.name as organization_name
+		FROM users AS u
+			join roles AS r
+				ON u.role_id = r.id
+         	join organizations AS o
+				ON u.organization_id = o.id
+		WHERE u.id = ?;`
+
+	DB.Raw(userQuery, userID).Scan(&user)
 	var info UserInfo
-	if len(result) == 0 {
-		return info
+	//todo: check user for nil
+	info.Email = user.Email
+	info.OrganizationID = user.OrganizationID
+	info.OrganizationName = user.OrganizationName
+	info.Role = user.Role
+
+	var organization []struct {
+		ID   uint
+		Name string
 	}
-	info.Email = result[0].Email
-	info.OrganizationID = result[0].OrganizationID
-	info.OrganizationName = result[0].OrganizationName
-	info.Role = result[0].Role
-	info.AllowAccessFrom = make(map[uint]string)
+
+	const allowAccessToQuery = `
+		SELECT o.id, 
+				o.name
+		FROM organizations_agreements AS oa
+			left join organizations o 
+				ON oa.to_id = o.id
+		WHERE oa.from_id = ?;`
+
+	DB.Raw(allowAccessToQuery, user.OrganizationID).Scan(&organization)
 	info.AllowAccessTo = make(map[uint]string)
-	for i := range result {
-		info.AllowAccessTo[result[i].ToID] = result[i].ToName
-		info.AllowAccessFrom[result[i].FromID] = result[i].FromName
+	for i := range organization {
+		info.AllowAccessTo[organization[i].ID] = organization[i].Name
 	}
+
+	const allowAccessFromQuery = `
+		SELECT o.id, 
+				o.name
+		FROM organizations_agreements AS oa
+			left join organizations o 
+				ON oa.from_id = o.id
+		WHERE oa.to_id = ?;`
+
+	DB.Raw(allowAccessFromQuery, user.OrganizationID).Scan(&organization)
+	info.AllowAccessFrom = make(map[uint]string)
+	for i := range organization {
+		info.AllowAccessFrom[organization[i].ID] = organization[i].Name
+	}
+
 	return info
 }
