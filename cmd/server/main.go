@@ -93,7 +93,7 @@ func main() {
 	refresh.HandlerFunc(RefreshHandler)
 
 	access := api.PathPrefix("/").Subrouter()
-	access.HandleFunc("/request", RequestHandler)
+	access.HandleFunc("/document", DocumentHandler)
 	access.HandleFunc("/userinfo", UserInfoHandler)
 	access.HandleFunc("/logout", LogoutHandler)
 	access.Use(authentication.Middleware)

@@ -1,7 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -11,21 +13,22 @@ import (
 	"github.com/BlockTeam4Boys/digitaldocs/internal/model"
 )
 
-func RequestHandler(w http.ResponseWriter, r *http.Request) {
+func DocumentHandler(w http.ResponseWriter, r *http.Request) {
 	//Parse values
 	r.ParseForm()
-	organizationIDAsStr := r.PostForm.Get("organization")
-	diplomaIDAsStr := r.PostForm.Get("diploma")
+	organizationIDAsStr := r.PostForm.Get("universityId")
+	number := r.PostForm.Get("number")
+	firstName := r.PostForm.Get("firstName")
+	secondName := r.PostForm.Get("secondName")
+	spec := r.PostForm.Get("spec")
+	year := r.PostForm.Get("year")
+
 	organizationID, err := strconv.Atoi(organizationIDAsStr)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	diplomaID, err := strconv.Atoi(diplomaIDAsStr)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
+
 	//Find userID in context
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok {
@@ -47,8 +50,41 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
 	//Request diploma
-	diploma := fmt.Sprintf(`cool diploma №%v`, diplomaID) //TODO: make diploma request
-	//Send response
-	w.Write([]byte(diploma))
+	diplomaRequestBody := map[string]interface{}{
+		"number":     number,
+		"firstName":  firstName,
+		"secondName": secondName,
+		"spec":       spec,
+		"year":       year,
+	}
+
+	bytesRepresentation, err := json.Marshal(diplomaRequestBody)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var url = "http://127.0.0.1:"
+	if organizationID == 2 {
+		url = url + "8888"
+	} else {
+		url = url + "8887"
+	}
+	url = url + "/diploma"
+
+	diplomaResponse, err := http.Post(url, "application/json", bytes.NewBuffer(bytesRepresentation))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	diploma, err := ioutil.ReadAll(diplomaResponse.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	w.Write(diploma)
 }
