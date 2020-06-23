@@ -67,9 +67,13 @@ func DocumentHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var url = "http://127.0.0.1:"
-	if organizationID == 2 {
+	if organizationID == 1 {
 		url = url + "8888"
-	} else {
+	}
+	if organizationID == 2 {
+		url = url + "8886"
+	}
+	if organizationID == 3 {
 		url = url + "8887"
 	}
 	url = url + "/diploma"
